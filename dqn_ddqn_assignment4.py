@@ -7,9 +7,10 @@ import torch.optim as optim
 import torch.autograd as autograd 
 import torch.nn.functional as F
 from collections import deque
+
 from IPython.display import clear_output
 import matplotlib.pyplot as plt
-get_ipython().run_line_magic('matplotlib', 'inline')
+#get_ipython().run_line_magic('matplotlib', 'inline')
 
 
 
@@ -26,7 +27,6 @@ class ReplayBuffer(object):
         experience = (state, action, reward, next_state, done)
         self.buffer.append(experience)
         # record the dimension of the state
-        
     
     def sample(self, batch_size):
         ''' To Do: sample a batch uniformly from replay buffer, sample without replacement.
@@ -40,16 +40,15 @@ class ReplayBuffer(object):
                              random.sample() for sampling without replacement
         '''
         # first initialize using np.empty()
-        state_batch = ...
-        action_batch = ...
-        reward_batch = ...
-        next_state_batch = ...
-        done_batch = ...
+        state_batch = np.empty((batch_size, self.state_dim))
+        action_batch = np.empty(batch_size)
+        reward_batch = np.empty(batch_size)
+        next_state_batch = np.empty((batch_size, self.state_dim))
+        done_batch = np.empty(batch_size)
         # Take #batch_size samples from the replay buffer and write into different arrays.        
-        batch = random.sample(....)
-        # To Do here...
-        ...
-        
+        batch = random.sample(batch_size)
+        state_batch, action_batch, reward_batch, next_state_batch, done_batch = self.buffer[batch]
+
         return state_batch, action_batch, reward_batch, next_state_batch, done_batch
 
 
@@ -57,13 +56,21 @@ class ReplayBuffer(object):
 class DQN(nn.Module):
     def __init__(self, num_inputs, num_actions):
         super(DQN, self).__init__()  
-        ''' To Do: Create the following network architecture:
+        ''' To Do [DONE]: Create the following network architecture:
             (1) The first input layer, a fully connected (FC) layer with (input_dim*64), followed by a PReLU layer, see literature for how PRelu works
             (2) A hidden layer, also FC, 64*64, and followed by PRELU
             (3) The output layer, FC layer, (64*number_of_actions) , no activations, as the output approximates the q(s,a)
             Useful function: nn.Sequential() , nn.Linear(), nn.PReLU()
         '''
-        self.layers = #To do...
+
+        self.layers = nn.Sequential(
+            nn.Linear(num_inputs,64),
+            nn.PReLU(),
+            nn.Linear(64, 64),
+            nn.PReLU(),
+            nn.Linear(64, num_actions)
+        )
+
         
         
     def forward(self, x):
@@ -72,19 +79,29 @@ class DQN(nn.Module):
         return self.layers(x)
     
     def act(self, state, epsilon):
-        ''' To Do: Perform epislon greedy exploration strategy here,
+        ''' To Do [DONE]: Perform epsilon greedy exploration strategy here,
             Return : action index in discrete action space, type(action) = int
             You will need to call the function: self.forward(state)
             Use np.random.random() 
         '''
+
+        activation = self.forward(state)
+
+        if np.random.rand(1) > epsilon:
+            action = np.argmax(activation)
+        else:
+            action = np.random.randint(0,len(activation))
+
         return action
 
     def test_act(self, state):
-        ''' To Do: Perform greedy action for the current state for the testing phase
+        ''' To Do [DONE]: Perform greedy action for the current state for the testing phase
             Return : action index in discrete action space, type(action) = int
             You will need to call the function: self.forward(state)
 
         '''
+        activation = self.forward(state)
+        action = np.argmax(activation)
         return action
 
 
@@ -102,14 +119,20 @@ def compute_td_loss(batch_size, replay_buffer, optimizer, device, model, model_t
     Useful function: in-place operations on tensors 'tensor_a.gather()' , 'tensor_b.unsqueeze()', 'tensor_x.squeeze()' , 'tensor.max()'
     Use : with torch.no_grad() ,  tensor.detach()  to make your td_target have no influence on backward gradient, i.e. semi-gradient on your td_target
     '''
-    loss = ....# Use MSEloss with mean reduction.
-    
-    
+    #TODO: this is only DQN
+
+    y = reward
+    # if not done:
+    y += gamma * model_target.forward(next_state).argmax(dim=1) * (1-done)
+
+    y = torch.no_grad(y)
+
+    loss = (y - model.forward(state).gather(1, action))**2
+
     optimizer.zero_grad()
     loss.backward()
     optimizer.step()
-    
-    
+
     return loss
 
 
@@ -172,8 +195,8 @@ if __name__ == "__main__":
     # Declare target network, initialize it 
     model_target = DQN(env.observation_space.shape[0], env.action_space.n)
     
-    # -->To Do: Copy the weights from model to model_target using 'load_state_dict'
-    model_target....
+    # To Do  [Done]: Copy the weights from model to model_target using 'load_state_dict'
+    model_target.load_state_dict(model.state_dict())
     
     # Put networks to GPU
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -275,13 +298,16 @@ if __name__ == "__main__":
                 est_Q_values_target_network.append(np.max(model_target(state_trial).cpu().numpy()))
          
         # update target network                         
-        if task == 1: 
-            # To Do : Perform soft update (Polyak averaging) with tau = 0.005 
+        if task == 1:
+            polyak_factor = 0.005
+            # To Do [Done]: Perform soft update (Polyak averaging) with tau = 0.005
             # Soft update # Refer to the post from Navneet_M_Kumar under https://discuss.pytorch.org/t/copying-weights-from-one-net-to-another/1492/16 for answer           
-            ...
+            for target_param, param in zip(model_target.parameters(), model.parameters()):
+                target_param.data.copy_(polyak_factor * param.data + target_param.data * (1.0 - polyak_factor))
         elif task == 2: 
-            # To do: hard update the target network every 3000 interactions. Useful variable: frame_idx
-            ...    
+            # To do [Done]: hard update the target network every 3000 interactions. Useful variable: frame_idx
+            if frame_idx % 3000 == 0:
+                model_target.load_state_dict(model.state_dict())
          
         if frame_idx % 2500 == 0:
             plot(frame_idx, all_rewards, losses, task)
@@ -289,6 +315,5 @@ if __name__ == "__main__":
             plt.plot(np.array(est_Q_values_target_network), color = 'b')
             # --> To Do: You can save the statistics here, using np.save()
             # You could first convert all_rewards and losses into np.array, and save as .npy.file
-            
             
             
