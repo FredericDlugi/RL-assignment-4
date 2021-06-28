@@ -40,14 +40,19 @@ class ReplayBuffer(object):
                              random.sample() for sampling without replacement
         '''
         # first initialize using np.empty()
-        state_batch = np.empty((batch_size, self.state_dim))
+        state_batch = np.empty((batch_size, self.state_dim[0]))
         action_batch = np.empty(batch_size)
         reward_batch = np.empty(batch_size)
-        next_state_batch = np.empty((batch_size, self.state_dim))
+        next_state_batch = np.empty((batch_size, self.state_dim[0]))
         done_batch = np.empty(batch_size)
         # Take #batch_size samples from the replay buffer and write into different arrays.        
-        batch = random.sample(batch_size)
-        state_batch, action_batch, reward_batch, next_state_batch, done_batch = self.buffer[batch]
+        batch = random.sample(self.buffer,batch_size)
+        batch = [list(i) for i in zip(*batch)]
+        state_batch = batch[0]
+        action_batch = batch[1]
+        reward_batch = batch[2]
+        next_state_batch = batch[3]
+        done_batch = batch[4]
 
         return state_batch, action_batch, reward_batch, next_state_batch, done_batch
 
@@ -84,13 +89,13 @@ class DQN(nn.Module):
             You will need to call the function: self.forward(state)
             Use np.random.random() 
         '''
-
+        state = torch.FloatTensor(np.float32(state)).to(device)
         activation = self.forward(state)
 
         if np.random.rand(1) > epsilon:
-            action = np.argmax(activation)
+            action = activation.argmax().item()
         else:
-            action = np.random.randint(0,len(activation))
+            action = np.random.randint(0,activation.size()[0])
 
         return action
 
@@ -120,14 +125,16 @@ def compute_td_loss(batch_size, replay_buffer, optimizer, device, model, model_t
     Use : with torch.no_grad() ,  tensor.detach()  to make your td_target have no influence on backward gradient, i.e. semi-gradient on your td_target
     '''
     #TODO: this is only DQN
+    with torch.no_grad():
+        y = reward
+        # if not done:
+        y += gamma * model_target.forward(next_state).argmax(dim=1) * (1-done)
 
-    y = reward
-    # if not done:
-    y += gamma * model_target.forward(next_state).argmax(dim=1) * (1-done)
-
-    y = torch.no_grad(y)
-
-    loss = (y - model.forward(state).gather(1, action))**2
+    loss = nn.MSELoss()
+    activation = model.forward(state)
+    activation = activation.gather(1,action.unsqueeze(1))
+    loss = loss(y, activation.squeeze())
+    # loss = nn.MSELoss(y, model.forward(state).gather(1, action))
 
     optimizer.zero_grad()
     loss.backward()
