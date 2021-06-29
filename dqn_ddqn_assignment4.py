@@ -126,16 +126,18 @@ def compute_td_loss(batch_size, replay_buffer, optimizer, device, model, model_t
     Use : with torch.no_grad() ,  tensor.detach()  to make your td_target have no influence on backward gradient, i.e. semi-gradient on your td_target
     '''
     #TODO: this is only DQN
-    with torch.no_grad():
-        y = reward
+    y = reward
+
+    if task == 1:
         # if not done:
-        y += gamma * model_target.forward(next_state).argmax(dim=1) * (1-done)
+        y += gamma * model_target.forward(next_state).detach().argmax(dim=1) * (1-done)
+    elif task == 2:
+        y += gamma * model_target.forward(next_state).detach().gather(1, model.forward(next_state).argmax(dim=1).unsqueeze(1)).squeeze() * (1-done)
 
     loss = nn.MSELoss()
     activation = model.forward(state)
     activation = activation.gather(1,action.unsqueeze(1))
     loss = loss(y, activation.squeeze())
-    # loss = nn.MSELoss(y, model.forward(state).gather(1, action))
 
     optimizer.zero_grad()
     loss.backward()
@@ -155,7 +157,7 @@ def test(env, model):
     for t in range(1000): 
         action = model.test_act(state)
         next_state, reward, done, _ = env.step(action)    
-        #env.render()        
+        # env.render()        
         state = next_state
         episode_reward += reward
         if done == True:                  
@@ -167,8 +169,10 @@ def plot(frame_idx, rewards, losses, task):
     '''
         For monitoring the training process
     '''
-    clear_output(True)
-    plt.figure(figsize=(20,5))
+    # clear_output(True)
+    
+    plt.figure(0,figsize=(20,5))
+    plt.clf()
     plt.subplot(121)
     plt.title('frame %s. reward: %s' % (frame_idx, np.mean(rewards[-10:])))
     if task == 1:
@@ -178,7 +182,8 @@ def plot(frame_idx, rewards, losses, task):
     plt.subplot(122)
     plt.title('loss')
     plt.plot(losses)
-    plt.show()
+    plt.pause(0.5)
+    
 
 
 
@@ -190,7 +195,7 @@ if __name__ == "__main__":
         It takes roughly 10 minutes to get converged to episodic reward >-150 in Colab. 
         You need to write code to save the statistics at the last line of the program.       
     '''
-    task = 1 # to modify for different task
+    task = 2 # to modify for different task
     if task == 1:
         env = gym.make('MountainCar-v0').env # the suffix .env removes the constraint of maximal episodic length of 200 steps 
     elif task == 2:
@@ -207,7 +212,7 @@ if __name__ == "__main__":
     model_target.load_state_dict(model.state_dict())
     
     # Put networks to GPU
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     model = model.to(device)
     model_target = model_target.to(device)
     
@@ -224,6 +229,8 @@ if __name__ == "__main__":
         epsilon_decay = 30000 
         epsilon_by_frame = lambda frame_idx: epsilon_final + (epsilon_start - epsilon_final) * math.exp(-1. * frame_idx / epsilon_decay)  
         # Plot the exploration rate w.r.t. number of steps (frame_index) the agent has traversed. 
+        plt.figure(1)
+        plt.clf()
         plt.plot([epsilon_by_frame(i) for i in range(100000)])
         
     elif task == 2:
@@ -238,6 +245,8 @@ if __name__ == "__main__":
         epsilon_decay = 50000 
         epsilon_by_frame = lambda frame_idx: epsilon_final + (epsilon_start - epsilon_final) * math.exp(-1. * frame_idx / epsilon_decay)  
         # Plot the exploration rate w.r.t. number of steps (frame_index) the agent has traversed. 
+        plt.figure(1)
+        plt.clf()
         plt.plot([epsilon_by_frame(i) for i in range(100000)])
         
     # Initialize the replay buffer with the maximal storage of 1000000 experience/interactions
@@ -319,9 +328,9 @@ if __name__ == "__main__":
          
         if frame_idx % 2500 == 0:
             plot(frame_idx, all_rewards, losses, task)
-            plt.plot(np.array(est_Q_values_running_network), color = 'r')
-            plt.plot(np.array(est_Q_values_target_network), color = 'b')
+            #plt.plot(np.array(est_Q_values_running_network), color = 'r')
+            #plt.plot(np.array(est_Q_values_target_network), color = 'b')
             # --> To Do: You can save the statistics here, using np.save()
             # You could first convert all_rewards and losses into np.array, and save as .npy.file
-            
+    plt.show()
             
