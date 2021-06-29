@@ -105,8 +105,9 @@ class DQN(nn.Module):
             You will need to call the function: self.forward(state)
 
         '''
+        state = torch.FloatTensor(np.float32(state)).to(device)
         activation = self.forward(state)
-        action = np.argmax(activation)
+        action = activation.argmax().item()
         return action
 
 
