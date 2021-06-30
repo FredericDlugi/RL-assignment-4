@@ -92,7 +92,7 @@ class DQN(nn.Module):
         state = torch.FloatTensor(np.float32(state)).to(device)
         activation = self.forward(state)
 
-        if np.random.rand(1) > epsilon:
+        if np.random.rand() > epsilon:
             action = activation.argmax().item()
         else:
             action = np.random.randint(0,activation.size()[0])
@@ -130,14 +130,15 @@ def compute_td_loss(batch_size, replay_buffer, optimizer, device, model, model_t
 
     if task == 1:
         # if not done:
-        y += gamma * model_target.forward(next_state).detach().argmax(dim=1) * (1-done)
+        y += gamma * model_target.forward(next_state).max(dim=1)[0] * (1-done)
     elif task == 2:
-        y += gamma * model_target.forward(next_state).detach().gather(1, model.forward(next_state).argmax(dim=1).unsqueeze(1)).squeeze() * (1-done)
+        y += gamma * model_target.forward(next_state).gather(1, model.forward(next_state).argmax(dim=1).unsqueeze(1)).squeeze() * (1-done)
 
-    loss = nn.MSELoss()
+    y = y.detach()
+    mse_loss = nn.MSELoss()
     activation = model.forward(state)
     activation = activation.gather(1,action.unsqueeze(1))
-    loss = loss(y, activation.squeeze())
+    loss = mse_loss(y, activation.squeeze())
 
     optimizer.zero_grad()
     loss.backward()
@@ -157,7 +158,7 @@ def test(env, model):
     for t in range(1000): 
         action = model.test_act(state)
         next_state, reward, done, _ = env.step(action)    
-        # env.render()        
+        env.render()
         state = next_state
         episode_reward += reward
         if done == True:                  
@@ -182,8 +183,7 @@ def plot(frame_idx, rewards, losses, task):
     plt.subplot(122)
     plt.title('loss')
     plt.plot(losses)
-    plt.pause(0.5)
-    
+
 
 
 
@@ -195,7 +195,7 @@ if __name__ == "__main__":
         It takes roughly 10 minutes to get converged to episodic reward >-150 in Colab. 
         You need to write code to save the statistics at the last line of the program.       
     '''
-    task = 2 # to modify for different task
+    task = 1 # to modify for different task
     if task == 1:
         env = gym.make('MountainCar-v0').env # the suffix .env removes the constraint of maximal episodic length of 200 steps 
     elif task == 2:
@@ -328,8 +328,13 @@ if __name__ == "__main__":
          
         if frame_idx % 2500 == 0:
             plot(frame_idx, all_rewards, losses, task)
-            #plt.plot(np.array(est_Q_values_running_network), color = 'r')
-            #plt.plot(np.array(est_Q_values_target_network), color = 'b')
+            plt.figure(2)
+            plt.clf()
+            plt.plot(np.array(est_Q_values_running_network), color = 'r')
+            plt.plot(np.array(est_Q_values_target_network), color = 'b')
+            plt.legend(['running-network', 'target-network'])
+            plt.pause(0.5)
+
             # --> To Do: You can save the statistics here, using np.save()
             # You could first convert all_rewards and losses into np.array, and save as .npy.file
     plt.show()
