@@ -7,6 +7,7 @@ import torch.optim as optim
 import torch.autograd as autograd 
 import torch.nn.functional as F
 from collections import deque
+import os
 
 from IPython.display import clear_output
 import matplotlib.pyplot as plt
@@ -157,8 +158,9 @@ def test(env, model):
     # Limit the maximal episode length to avoid infinite loop
     for t in range(1000): 
         action = model.test_act(state)
-        next_state, reward, done, _ = env.step(action)    
-        env.render()
+        next_state, reward, done, _ = env.step(action)
+        if(render):
+            env.render()
         state = next_state
         episode_reward += reward
         if done == True:                  
@@ -195,7 +197,12 @@ if __name__ == "__main__":
         It takes roughly 10 minutes to get converged to episodic reward >-150 in Colab. 
         You need to write code to save the statistics at the last line of the program.       
     '''
-    task = 1 # to modify for different task
+    task = 2 # to modify for different task
+    team_member_id = 'frederic-don-luigi'
+    render = False
+
+    data_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "data", f"task_{task}")
+
     if task == 1:
         env = gym.make('MountainCar-v0').env # the suffix .env removes the constraint of maximal episodic length of 200 steps 
     elif task == 2:
@@ -232,6 +239,7 @@ if __name__ == "__main__":
         plt.figure(1)
         plt.clf()
         plt.plot([epsilon_by_frame(i) for i in range(100000)])
+        num_frames = 200000
         
     elif task == 2:
         batch_size = 64
@@ -248,6 +256,7 @@ if __name__ == "__main__":
         plt.figure(1)
         plt.clf()
         plt.plot([epsilon_by_frame(i) for i in range(100000)])
+        num_frames = 1000000
         
     # Initialize the replay buffer with the maximal storage of 1000000 experience/interactions
     replay_buffer = ReplayBuffer(600000, env.observation_space.shape)    
@@ -269,7 +278,7 @@ if __name__ == "__main__":
        
     #---------------------Training----------------------
     # You don't need to run 0.5M frames, you could terminate earlier when the return is around -150. Save the statistics of episodic returns and predicted Q-values
-    num_frames = 1000000 # maximal number of interactions, similar to N_episodes in previous assignments 
+    #num_frames = 1000000 # maximal number of interactions, similar to N_episodes in previous assignments
     
     state = env.reset()
     for frame_idx in range(1, num_frames + 1):
@@ -293,8 +302,8 @@ if __name__ == "__main__":
         
         if done:
             all_rewards.append(episode_reward)
-            print("Episode#:{} reward:{} eps:{}".format(episode_count,
-                                     episode_reward, epsilon))
+            print("Episode#:{} reward:{} eps:{} (Frame: {}/{})".format(episode_count,
+                                     episode_reward, epsilon, frame_idx, num_frames))
             episode_reward = 0
             episode_count += 1
             episodic_step_count = 0
@@ -335,7 +344,10 @@ if __name__ == "__main__":
             plt.legend(['running-network', 'target-network'])
             plt.pause(0.5)
 
-            # --> To Do: You can save the statistics here, using np.save()
-            # You could first convert all_rewards and losses into np.array, and save as .npy.file
+
+
+    # --> To Do: You can save the statistics here, using np.save()
+    # You could first convert all_rewards and losses into np.array, and save as .npy.file
+    np.savez(os.path.join(data_path, team_member_id), est_Q_values_running_network = np.array(est_Q_values_running_network), est_Q_values_target_network = np.array(est_Q_values_target_network), all_rewards = all_rewards, losses = losses)
     plt.show()
             
