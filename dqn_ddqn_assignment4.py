@@ -188,6 +188,7 @@ def plot(frame_idx, rewards, losses, task):
 
 def run(team_member_id, task, render):
     data_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "data", f"task_{task}")
+    os.makedirs(data_path, exist_ok=True)
 
     if task == 1:
         env = gym.make(
@@ -353,7 +354,7 @@ if __name__ == "__main__":
 
     members = ['moritz', 'frederic', 'robin', 'franek']
     for member in members:
-        run(team_member_id, task, render)
+        run(member, task, render)
 
 
             
