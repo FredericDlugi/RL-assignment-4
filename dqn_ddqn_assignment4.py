@@ -186,100 +186,87 @@ def plot(frame_idx, rewards, losses, task):
     plt.title('loss')
     plt.plot(losses)
 
-
-
-
-if __name__ == "__main__":    
-    '''
-        Important: The maximal number of interactions: num_frames = 1000000,
-        But it is definitely NOT NECESSARY to ran until the end.
-        If the training episodic reward already converges >-150, then you can STOP the program.
-        It takes roughly 10 minutes to get converged to episodic reward >-150 in Colab. 
-        You need to write code to save the statistics at the last line of the program.       
-    '''
-    task = 2 # to modify for different task
-    team_member_id = 'frederic-don-luigi'
-    render = False
-
+def run(team_member_id, task, render):
     data_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "data", f"task_{task}")
 
     if task == 1:
-        env = gym.make('MountainCar-v0').env # the suffix .env removes the constraint of maximal episodic length of 200 steps 
+        env = gym.make(
+            'MountainCar-v0').env  # the suffix .env removes the constraint of maximal episodic length of 200 steps
     elif task == 2:
-        env = gym.make('LunarLander-v2') # An episode will be forced to terminate after 1000 steps in this env setting.
-    print(env.observation_space, env.action_space)   #observation_space and action space
-    
-    
+        env = gym.make('LunarLander-v2')  # An episode will be forced to terminate after 1000 steps in this env setting.
+    print(env.observation_space, env.action_space)  # observation_space and action space
+
     # Initialize the Deep Q-networks
     model = DQN(env.observation_space.shape[0], env.action_space.n)
-    # Declare target network, initialize it 
+    # Declare target network, initialize it
     model_target = DQN(env.observation_space.shape[0], env.action_space.n)
-    
+
     # To Do  [Done]: Copy the weights from model to model_target using 'load_state_dict'
     model_target.load_state_dict(model.state_dict())
-    
+
     # Put networks to GPU
-    device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     model = model.to(device)
     model_target = model_target.to(device)
-    
+
     # Initialize the optimizer for learning the weights of Neural Network
-    optimizer = optim.Adam(model.parameters(), lr = 0.001)    
-    if task == 1: 
+    optimizer = optim.Adam(model.parameters(), lr=0.001)
+    if task == 1:
         batch_size = 64
         test_every_N_training_episode = 10
         start_train = 1000
-        
+
         # Initialize the exploration strategy/coefficient
         epsilon_start = 1.0
-        epsilon_final = 0.05 # to ensure sufficient exploration 
-        epsilon_decay = 30000 
-        epsilon_by_frame = lambda frame_idx: epsilon_final + (epsilon_start - epsilon_final) * math.exp(-1. * frame_idx / epsilon_decay)  
-        # Plot the exploration rate w.r.t. number of steps (frame_index) the agent has traversed. 
+        epsilon_final = 0.05  # to ensure sufficient exploration
+        epsilon_decay = 30000
+        epsilon_by_frame = lambda frame_idx: epsilon_final + (epsilon_start - epsilon_final) * math.exp(
+            -1. * frame_idx / epsilon_decay)
+        # Plot the exploration rate w.r.t. number of steps (frame_index) the agent has traversed.
         plt.figure(1)
         plt.clf()
         plt.plot([epsilon_by_frame(i) for i in range(100000)])
         num_frames = 200000
-        
+
     elif task == 2:
         batch_size = 64
         test_every_N_training_episode = 10
         # Only start training when there is a sufficient number of experience stored in replay buffer
-        start_train = 3000 
-        
+        start_train = 3000
+
         # Initialize the exploration strategy/coefficient
         epsilon_start = 1.0
-        epsilon_final = 0.05 # to ensure sufficient exploration 
-        epsilon_decay = 50000 
-        epsilon_by_frame = lambda frame_idx: epsilon_final + (epsilon_start - epsilon_final) * math.exp(-1. * frame_idx / epsilon_decay)  
-        # Plot the exploration rate w.r.t. number of steps (frame_index) the agent has traversed. 
+        epsilon_final = 0.05  # to ensure sufficient exploration
+        epsilon_decay = 50000
+        epsilon_by_frame = lambda frame_idx: epsilon_final + (epsilon_start - epsilon_final) * math.exp(
+            -1. * frame_idx / epsilon_decay)
+        # Plot the exploration rate w.r.t. number of steps (frame_index) the agent has traversed.
         plt.figure(1)
         plt.clf()
         plt.plot([epsilon_by_frame(i) for i in range(100000)])
-        num_frames = 1000000
-        
+        num_frames = 350000
+
     # Initialize the replay buffer with the maximal storage of 1000000 experience/interactions
-    replay_buffer = ReplayBuffer(600000, env.observation_space.shape)    
+    replay_buffer = ReplayBuffer(600000, env.observation_space.shape)
 
-    gamma = 0.99 # discount factor
+    gamma = 0.99  # discount factor
 
-    # Statistics 
+    # Statistics
     losses = []
     all_rewards = []
     episode_reward = 0
     episode_count = 0
     episodic_step_count = 0
-    
-    # -----state_trail is the initial state whose estimated q-value will be examined.----- 
+
+    # -----state_trail is the initial state whose estimated q-value will be examined.-----
     state_trial = env.reset()
     state_trial = torch.FloatTensor(np.float32(state_trial)).to(device)
     est_Q_values_running_network = []
     est_Q_values_target_network = []
-       
-    #---------------------Training----------------------
+
+    # ---------------------Training----------------------
     # You don't need to run 0.5M frames, you could terminate earlier when the return is around -150. Save the statistics of episodic returns and predicted Q-values
-    #num_frames = 1000000 # maximal number of interactions, similar to N_episodes in previous assignments
-    
+    # num_frames = 1000000 # maximal number of interactions, similar to N_episodes in previous assignments
+
     state = env.reset()
     for frame_idx in range(1, num_frames + 1):
         # determine the exploration rate for this step
@@ -290,31 +277,30 @@ if __name__ == "__main__":
         episodic_step_count += 1
         # Add the experience to the replay buffer
         if task == 1:
-            replay_buffer.push(state, action, reward, next_state, done)       
+            replay_buffer.push(state, action, reward, next_state, done)
         elif task == 2:
             # If terminate due to reaching max epi length, we put done as False to replay buffer so to allow bootstrapping of next successor state
-            if episodic_step_count == env._max_episode_steps:  
+            if episodic_step_count == env._max_episode_steps:
                 replay_buffer.push(state, action, reward, next_state, False)
             else:
                 replay_buffer.push(state, action, reward, next_state, done)
         state = next_state
-        episode_reward += reward       
-        
+        episode_reward += reward
+
         if done:
             all_rewards.append(episode_reward)
             print("Episode#:{} reward:{} eps:{} (Frame: {}/{})".format(episode_count,
-                                     episode_reward, epsilon, frame_idx, num_frames))
+                                                                       episode_reward, epsilon, frame_idx, num_frames))
             episode_reward = 0
             episode_count += 1
             episodic_step_count = 0
             # ---------------------Test Phase--------------------
-            if len(all_rewards)%test_every_N_training_episode == test_every_N_training_episode-1:
+            if len(all_rewards) % test_every_N_training_episode == test_every_N_training_episode - 1:
                 test(env, model)
-            #----------------------------------------------
+            # ----------------------------------------------
             state = env.reset()
-            
-            
-        # Ensure there are enough samples in the replay buffer, then start training the network    
+
+        # Ensure there are enough samples in the replay buffer, then start training the network
         if len(replay_buffer) > start_train:
             loss = compute_td_loss(batch_size, replay_buffer, optimizer, device, model, model_target, gamma)
             losses.append(loss.detach().cpu().numpy())
@@ -322,32 +308,52 @@ if __name__ == "__main__":
             with torch.no_grad():
                 est_Q_values_running_network.append(np.max(model(state_trial).cpu().numpy()))
                 est_Q_values_target_network.append(np.max(model_target(state_trial).cpu().numpy()))
-         
-        # update target network                         
+
+        # update target network
         if task == 1:
             polyak_factor = 0.005
             # To Do [Done]: Perform soft update (Polyak averaging) with tau = 0.005
-            # Soft update # Refer to the post from Navneet_M_Kumar under https://discuss.pytorch.org/t/copying-weights-from-one-net-to-another/1492/16 for answer           
+            # Soft update # Refer to the post from Navneet_M_Kumar under https://discuss.pytorch.org/t/copying-weights-from-one-net-to-another/1492/16 for answer
             for target_param, param in zip(model_target.parameters(), model.parameters()):
                 target_param.data.copy_(polyak_factor * param.data + target_param.data * (1.0 - polyak_factor))
-        elif task == 2: 
+        elif task == 2:
             # To do [Done]: hard update the target network every 3000 interactions. Useful variable: frame_idx
             if frame_idx % 3000 == 0:
                 model_target.load_state_dict(model.state_dict())
-         
+
         if frame_idx % 2500 == 0:
             plot(frame_idx, all_rewards, losses, task)
             plt.figure(2)
             plt.clf()
-            plt.plot(np.array(est_Q_values_running_network), color = 'r')
-            plt.plot(np.array(est_Q_values_target_network), color = 'b')
+            plt.plot(np.array(est_Q_values_running_network), color='r')
+            plt.plot(np.array(est_Q_values_target_network), color='b')
             plt.legend(['running-network', 'target-network'])
             plt.pause(0.5)
 
-
-
     # --> To Do: You can save the statistics here, using np.save()
     # You could first convert all_rewards and losses into np.array, and save as .npy.file
-    np.savez(os.path.join(data_path, team_member_id), est_Q_values_running_network = np.array(est_Q_values_running_network), est_Q_values_target_network = np.array(est_Q_values_target_network), all_rewards = all_rewards, losses = losses)
+    np.savez(os.path.join(data_path, team_member_id),
+             est_Q_values_running_network=np.array(est_Q_values_running_network),
+             est_Q_values_target_network=np.array(est_Q_values_target_network), all_rewards=all_rewards, losses=losses)
     plt.show()
+
+
+if __name__ == "__main__":    
+    '''
+        Important: The maximal number of interactions: num_frames = 1000000,
+        But it is definitely NOT NECESSARY to ran until the end.
+        If the training episodic reward already converges >-150, then you can STOP the program.
+        It takes roughly 10 minutes to get converged to episodic reward >-150 in Colab. 
+        You need to write code to save the statistics at the last line of the program.       
+    '''
+    task = 1 # to modify for different task
+    team_member_id = 'frederic'
+    render = False
+    device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+
+    members = ['moritz', 'frederic', 'robin', 'franek']
+    for member in members:
+        run(team_member_id, task, render)
+
+
             
