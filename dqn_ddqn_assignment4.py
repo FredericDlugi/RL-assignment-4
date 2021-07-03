@@ -336,7 +336,8 @@ def run(team_member_id, task, render):
     np.savez(os.path.join(data_path, team_member_id),
              est_Q_values_running_network=np.array(est_Q_values_running_network),
              est_Q_values_target_network=np.array(est_Q_values_target_network), all_rewards=all_rewards, losses=losses)
-    plt.show()
+    #plt.show()
+    #plt.close()
 
 
 if __name__ == "__main__":    
@@ -355,6 +356,7 @@ if __name__ == "__main__":
     members = ['moritz', 'frederic', 'robin', 'franek']
     for member in members:
         run(member, task, render)
+        
 
 
             
