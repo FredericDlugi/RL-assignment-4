@@ -186,7 +186,20 @@ def plot(frame_idx, rewards, losses, task):
     plt.title('loss')
     plt.plot(losses)
 
-def run(team_member_id, task, render):
+if __name__ == "__main__":    
+    '''
+        Important: The maximal number of interactions: num_frames = 1000000,
+        But it is definitely NOT NECESSARY to ran until the end.
+        If the training episodic reward already converges >-150, then you can STOP the program.
+        It takes roughly 10 minutes to get converged to episodic reward >-150 in Colab. 
+        You need to write code to save the statistics at the last line of the program.       
+    '''
+    task = 1 # to modify for different task
+
+    team_member_id = 'moritz'
+    render = False
+    device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+
     data_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "data", f"task_{task}")
     os.makedirs(data_path, exist_ok=True)
 
@@ -336,26 +349,10 @@ def run(team_member_id, task, render):
     np.savez(os.path.join(data_path, team_member_id),
              est_Q_values_running_network=np.array(est_Q_values_running_network),
              est_Q_values_target_network=np.array(est_Q_values_target_network), all_rewards=all_rewards, losses=losses)
-    #plt.show()
-    #plt.close()
+    plt.show()
 
 
-if __name__ == "__main__":    
-    '''
-        Important: The maximal number of interactions: num_frames = 1000000,
-        But it is definitely NOT NECESSARY to ran until the end.
-        If the training episodic reward already converges >-150, then you can STOP the program.
-        It takes roughly 10 minutes to get converged to episodic reward >-150 in Colab. 
-        You need to write code to save the statistics at the last line of the program.       
-    '''
-    task = 1 # to modify for different task
-    team_member_id = 'frederic'
-    render = False
-    device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 
-    members = ['moritz', 'frederic', 'robin', 'franek']
-    for member in members:
-        run(member, task, render)
         
 
 
